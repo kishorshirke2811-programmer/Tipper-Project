@@ -1,19 +1,22 @@
-#create insurance
 import json
 import random
+import time
 from datetime import datetime, timedelta
 
-class Insurance:
+
+class InsuranceSystem:
     FILE = "insurance.json"
 
     def __init__(self):
-        # Load insurance records
         try:
             with open(self.FILE, "r") as f:
                 self.records = json.load(f)
         except (FileNotFoundError, json.JSONDecodeError):
             self.records = []
 
+    # -------------------
+    # SAVE DATA
+    # -------------------
     def save_data(self):
         with open(self.FILE, "w") as f:
             json.dump(self.records, f, indent=4, default=str)
@@ -77,7 +80,7 @@ class Insurance:
             except ValueError as e:
                 print(f"Invalid date: {e}. Please enter a valid date (YYYY-MM-DD).")
 
-        # Expiry date exactly 1 year
+        # Expiry date exactly 1 year later
         expiry_date = issue_date + timedelta(days=365)
 
         # Insurance ID: 11-digit numeric
@@ -95,7 +98,7 @@ class Insurance:
         self.records.append(record)
         self.save_data()
 
-        print("\nInsurance Created Successfully!")
+        print("\n Insurance Created Successfully!")
         print("Insurance ID:", insurance_id)
         print("Expiry Date:", expiry_date.strftime("%Y-%m-%d"))
 
@@ -120,14 +123,14 @@ class Insurance:
             except ValueError as e:
                 print(f"Invalid date: {e}. Please enter a valid date (YYYY-MM-DD).")
 
-        # Expiry exactly 1 year
+        # Expiry exactly 1 year later
         expiry_date = issue_date + timedelta(days=365)
         matched["Issue Date"] = new_issue
         matched["Expiry Date"] = expiry_date.strftime("%Y-%m-%d")
         matched["Status"] = "ACTIVE"
 
         self.save_data()
-        print("\nIssue and Expiry Dates Updated Successfully!")
+        print("\n Issue and Expiry Dates Updated Successfully!")
         print(f"New Expiry Date: {expiry_date.strftime('%Y-%m-%d')}")
 
     # -------------------
@@ -149,10 +152,9 @@ class Insurance:
         if not found:
             print(f"No insurance found for Vehicle ID: {vehicle_id}. Status: INACTIVE")
 
-# -------------------
-# EXTENDED CLASS FOR GET
-# -------------------
-class InsuranceGetter(Insurance):
+    # -------------------
+    # GET INSURANCE BY ID
+    # -------------------
     def get_insurance(self):
         print("\n--- GET INSURANCE BY ID ---")
         insurance_id = input("Enter Insurance ID: ").strip()
@@ -162,6 +164,9 @@ class InsuranceGetter(Insurance):
         else:
             print("No record found with this Insurance ID.")
 
+    # -------------------
+    # GET INSURANCE LIST
+    # -------------------
     def get_insurance_list(self):
         print("\n--- GET INSURANCE LIST ---")
         if not self.records:
@@ -171,11 +176,50 @@ class InsuranceGetter(Insurance):
         for rec in self.records:
             print(json.dumps(rec, indent=4))
 
+    # -------------------
+    # AUTO CLEANER: DELETE INACTIVE INSURANCE
+    # -------------------
+    def check_and_delete_inactive(self):
+        print(f"\n[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] Checking insurance status...")
+
+        active_records = []
+        deleted_count = 0
+
+        for record in self.records:
+            expiry_date = datetime.strptime(record["Expiry Date"], "%Y-%m-%d")
+            today = datetime.today()
+
+            if expiry_date >= today:
+                record["Status"] = "ACTIVE"
+                active_records.append(record)
+            else:
+                record["Status"] = "INACTIVE"
+                deleted_count += 1
+                print(f" Deleted INACTIVE insurance: {record['Insurance ID']} (Vehicle: {record['Vehicle ID']})")
+
+        self.records = active_records
+        self.save_data()
+        print(f" Cleanup completed — {deleted_count} inactive insurances removed.\n")
+
+    # -------------------
+    # RUN CLEANUP DAILY AT MIDNIGHT
+    # -------------------
+    def run_daily_at_midnight(self):
+        print("Insurance auto-cleaner started. It will check every minute and run cleanup at midnight (00:00).")
+        while True:
+            current_time = datetime.now().strftime("%H:%M")
+            if current_time == "00:00":
+                self.check_and_delete_inactive()
+                time.sleep(61)  # Avoid double runs
+            else:
+                time.sleep(60)
+
+
 # -------------------
 # MAIN MENU
 # -------------------
 if __name__ == "__main__":
-    system = InsuranceGetter()
+    system = InsuranceSystem()
 
     while True:
         print("\n--- INSURANCE SYSTEM MENU ---")
@@ -184,7 +228,9 @@ if __name__ == "__main__":
         print("3. Check Insurance Status")
         print("4. Get Insurance by ID")
         print("5. Get Insurance List")
-        print("6. Exit")
+        print("6. Run Cleanup Now")
+        print("7. Start Auto-Cleanup at Midnight")
+        print("8. Exit")
 
         choice = input("Enter your choice: ").strip()
         if choice == "1":
@@ -198,8 +244,11 @@ if __name__ == "__main__":
         elif choice == "5":
             system.get_insurance_list()
         elif choice == "6":
+            system.check_and_delete_inactive()
+        elif choice == "7":
+            system.run_daily_at_midnight()
+        elif choice == "8":
             print("Exiting program... Goodbye!")
             break
         else:
             print("Invalid choice, Try again.")
-
